@@ -1,0 +1,80 @@
+// Grafana Alloy (runs on WINDOWS as a service) -> Loki in WSL
+// Install path: C:\Program Files\GrafanaLabs\Alloy\config.alloy
+// Health UI:    http://localhost:12345
+
+loki.write "wsl" {
+  endpoint {
+    url = "http://localhost:3100/loki/api/v1/push"
+  }
+}
+
+// Promote event_id to a label so dashboard queries stay fast (low cardinality: ~30 IDs)
+loki.process "winevt" {
+  forward_to = [loki.write.wsl.receiver]
+  stage.json {
+    expressions = { event_id = "event_id" }
+  }
+  stage.labels {
+    values = { event_id = "" }
+  }
+}
+
+// Logons, privileges, process creation, account/group changes, audit tampering
+loki.source.windowsevent "security" {
+  eventlog_name          = "Security"
+  xpath_query            = "*[System[(EventID=4624 or EventID=4625 or EventID=4672 or EventID=4688 or EventID=4719 or EventID=4720 or EventID=4722 or EventID=4725 or EventID=4726 or EventID=4728 or EventID=4732 or EventID=4740 or EventID=4756 or EventID=1102)]]"
+  bookmark_path          = "C:/ProgramData/GrafanaLabs/Alloy/bookmark-security.xml"
+  use_incoming_timestamp = true
+  labels                 = { job = "windows", channel = "security", host = constants.hostname }
+  forward_to             = [loki.process.winevt.receiver]
+}
+
+// New services, log cleared, startup/shutdown/unexpected shutdown, service start-type changes
+loki.source.windowsevent "system" {
+  eventlog_name          = "System"
+  xpath_query            = "*[System[(EventID=7045 or EventID=104 or EventID=6005 or EventID=6006 or EventID=6008 or EventID=7040)]]"
+  bookmark_path          = "C:/ProgramData/GrafanaLabs/Alloy/bookmark-system.xml"
+  use_incoming_timestamp = true
+  labels                 = { job = "windows", channel = "system", host = constants.hostname }
+  forward_to             = [loki.process.winevt.receiver]
+}
+
+// Defender: detections, real-time protection disabled, config changed
+loki.source.windowsevent "defender" {
+  eventlog_name          = "Microsoft-Windows-Windows Defender/Operational"
+  xpath_query            = "*[System[(EventID=1116 or EventID=1117 or EventID=5001 or EventID=5007)]]"
+  bookmark_path          = "C:/ProgramData/GrafanaLabs/Alloy/bookmark-defender.xml"
+  use_incoming_timestamp = true
+  labels                 = { job = "windows", channel = "defender", host = constants.hostname }
+  forward_to             = [loki.process.winevt.receiver]
+}
+
+// PowerShell: only script blocks Windows auto-flags as suspicious (Level 3 = Warning)
+loki.source.windowsevent "powershell" {
+  eventlog_name          = "Microsoft-Windows-PowerShell/Operational"
+  xpath_query            = "*[System[(EventID=4104) and (Level=3)]]"
+  bookmark_path          = "C:/ProgramData/GrafanaLabs/Alloy/bookmark-powershell.xml"
+  use_incoming_timestamp = true
+  labels                 = { job = "windows", channel = "powershell", host = constants.hostname }
+  forward_to             = [loki.process.winevt.receiver]
+}
+
+// DNS client queries (needs the channel enabled; see enable-auditing.ps1) - feeds shadow-AI panel
+loki.source.windowsevent "dns" {
+  eventlog_name          = "Microsoft-Windows-DNS-Client/Operational"
+  xpath_query            = "*[System[(EventID=3008)]]"
+  bookmark_path          = "C:/ProgramData/GrafanaLabs/Alloy/bookmark-dns.xml"
+  use_incoming_timestamp = true
+  labels                 = { job = "windows", channel = "dns", host = constants.hostname }
+  forward_to             = [loki.process.winevt.receiver]
+}
+
+// OPTIONAL: uncomment after installing Sysmon
+// loki.source.windowsevent "sysmon" {
+//   eventlog_name          = "Microsoft-Windows-Sysmon/Operational"
+//   xpath_query            = "*"
+//   bookmark_path          = "C:/ProgramData/GrafanaLabs/Alloy/bookmark-sysmon.xml"
+//   use_incoming_timestamp = true
+//   labels                 = { job = "windows", channel = "sysmon", host = constants.hostname }
+//   forward_to             = [loki.process.winevt.receiver]
+// }
