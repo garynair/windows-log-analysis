@@ -1,3 +1,5 @@
+![Windows Log Stack: Alloy → Loki → Grafana (+ optional AI digest)](docs/banner.png)
+
 # Windows Log Stack: Alloy → Loki → Grafana (+ optional AI digest)
 
 ```
