@@ -155,11 +155,12 @@ def main():
     headline = d.get("headline", "")
     if RANK.index(floor) > RANK.index(llm_sev) and reasons:
         headline = reasons[0] + (f" (+{len(reasons) - 1} more)" if len(reasons) > 1 else "")  # rules raised it: say why
-    checks = list(dict.fromkeys(rule_checks + list(d.get("recommended_checks", []))))
+    as_list = lambda v: v if isinstance(v, list) else []
+    checks = list(dict.fromkeys(rule_checks + as_list(d.get("recommended_checks"))))
     digest = {"date": time.strftime("%Y-%m-%d"), "severity": severity, "severity_floor": floor,
               "llm_severity": d.get("severity"), "headline": headline, "llm_headline": d.get("headline", ""),
               "severity_reasons": reasons,
-              "findings": d.get("findings", []), "recommended_checks": checks,
+              "findings": as_list(d.get("findings")), "recommended_checks": checks,
               "event_counts": facts["event_counts"], "source": "script",
               "note": "AI-generated summary; verify against raw events"}
     http(f"{LOKI}/loki/api/v1/push", {"streams": [{
