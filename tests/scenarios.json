@@ -1,0 +1,142 @@
+{
+  "_comment": "Shared cases for digest/windows_digest.py (test_digest.py) and the n8n workflow (n8n.test.mjs). Both must produce these results, which keeps the two digest paths in step. c24/c7 rows are [event_id, channel, count]; history_days is how many of the last 7 days contain any events.",
+  "facts": [
+    {
+      "name": "routine activity only",
+      "history_days": 7,
+      "c24": [["3008", "Microsoft-Windows-DNS-Client/Operational", 500], ["4624", "Security", 17]],
+      "c7": [["3008", "Microsoft-Windows-DNS-Client/Operational", 3500], ["4624", "Security", 119]],
+      "expected": { "floor": "info", "reasons": [], "checks": [], "spikes": [], "baseline_days": 6 }
+    },
+    {
+      "name": "audit policy changed forces investigate",
+      "history_days": 1,
+      "c24": [["4624", "Security", 17], ["4719", "Security", 46]],
+      "c7": [["4624", "Security", 17], ["4719", "Security", 46]],
+      "expected": {
+        "floor": "investigate",
+        "reasons": ["Audit policy changed (46x in 24h)"],
+        "checks": ["Confirm the audit policy change was authorized: check the event's Subject account and run 'auditpol /get /category:*'."],
+        "spikes": [],
+        "baseline_days": 0
+      }
+    },
+    {
+      "name": "tamper signals are listed before watch items",
+      "history_days": 7,
+      "c24": [["4720", "Security", 2], ["7045", "System", 3], ["1102", "Security", 1]],
+      "c7": [["4720", "Security", 2], ["7045", "System", 3], ["1102", "Security", 1]],
+      "expected": {
+        "floor": "investigate",
+        "reasons": ["Security log cleared (1x in 24h)", "New service installed (3x in 24h)", "User account created (2x in 24h)"],
+        "checks": [
+          "Identify who cleared the Security log and why (see the event's Subject account).",
+          "Confirm each newly installed service is expected software.",
+          "Verify each account or group change against an approved request."
+        ],
+        "spikes": [],
+        "baseline_days": 6
+      }
+    },
+    {
+      "name": "failed-logon spike with a full baseline",
+      "history_days": 7,
+      "c24": [["4625", "Security", 30], ["4624", "Security", 20]],
+      "c7": [["4625", "Security", 42], ["4624", "Security", 140]],
+      "expected": {
+        "floor": "watch",
+        "reasons": ["Unusual volume: Failed logon (30 vs ~2.0/day)"],
+        "checks": ["Find the source of the increase in Failed logon events."],
+        "spikes": ["4625"],
+        "baseline_days": 6
+      }
+    },
+    {
+      "name": "no spikes while the baseline is warming up",
+      "history_days": 3,
+      "c24": [["4625", "Security", 30]],
+      "c7": [["4625", "Security", 34]],
+      "expected": { "floor": "info", "reasons": [], "checks": [], "spikes": [], "baseline_days": 2 }
+    },
+    {
+      "name": "small counts never count as a spike",
+      "history_days": 7,
+      "c24": [["4625", "Security", 4]],
+      "c7": [["4625", "Security", 4]],
+      "expected": { "floor": "info", "reasons": [], "checks": [], "spikes": [], "baseline_days": 6 }
+    },
+    {
+      "name": "a spiking tamper event is reported twice",
+      "history_days": 4,
+      "c24": [["4719", "Security", 12]],
+      "c7": [["4719", "Security", 15]],
+      "expected": {
+        "floor": "investigate",
+        "reasons": ["Audit policy changed (12x in 24h)", "Unusual volume: Audit policy changed (12 vs ~1.0/day)"],
+        "checks": [
+          "Confirm the audit policy change was authorized: check the event's Subject account and run 'auditpol /get /category:*'.",
+          "Find the source of the increase in Audit policy changed events."
+        ],
+        "spikes": ["4719"],
+        "baseline_days": 3
+      }
+    },
+    {
+      "name": "unknown event IDs are named other",
+      "history_days": 7,
+      "c24": [["9999", "System", 3]],
+      "c7": [["9999", "System", 21]],
+      "expected": { "floor": "info", "reasons": [], "checks": [], "spikes": [], "baseline_days": 6 }
+    }
+  ],
+  "finalize": [
+    {
+      "name": "rules raise severity and replace the headline",
+      "floor": "investigate",
+      "reasons": ["Audit policy changed (46x in 24h)", "User account created (1x in 24h)"],
+      "rule_checks": ["Check A"],
+      "llm": "{\"headline\": \"Routine Activity\", \"severity\": \"info\", \"findings\": [\"f\"], \"recommended_checks\": [\"Check B\", \"Check A\"]}",
+      "expected": { "severity": "investigate", "headline": "Audit policy changed (46x in 24h) (+1 more)", "checks": ["Check A", "Check B"] }
+    },
+    {
+      "name": "a higher model severity is kept with its headline",
+      "floor": "watch",
+      "reasons": ["User account created (1x in 24h)"],
+      "rule_checks": [],
+      "llm": "{\"headline\": \"Possible brute force\", \"severity\": \"investigate\", \"findings\": [], \"recommended_checks\": []}",
+      "expected": { "severity": "investigate", "headline": "Possible brute force", "checks": [] }
+    },
+    {
+      "name": "markdown fences are stripped",
+      "floor": "info",
+      "reasons": [],
+      "rule_checks": [],
+      "llm": "```json\n{\"headline\": \"Quiet day\", \"severity\": \"info\", \"findings\": [], \"recommended_checks\": []}\n```",
+      "expected": { "severity": "info", "headline": "Quiet day", "checks": [] }
+    },
+    {
+      "name": "unparseable model output publishes facts only",
+      "floor": "info",
+      "reasons": [],
+      "rule_checks": [],
+      "llm": "Sorry, I cannot help with that.",
+      "expected": { "severity": "info", "headline": "LLM summary unavailable - facts only", "checks": [] }
+    },
+    {
+      "name": "unparseable model output still reports rule findings",
+      "floor": "investigate",
+      "reasons": ["Security log cleared (1x in 24h)"],
+      "rule_checks": ["Check A"],
+      "llm": "not json",
+      "expected": { "severity": "investigate", "headline": "Security log cleared (1x in 24h)", "checks": ["Check A"] }
+    },
+    {
+      "name": "invalid severity and non-list checks are ignored",
+      "floor": "watch",
+      "reasons": ["New service installed (1x in 24h)"],
+      "rule_checks": ["Check A"],
+      "llm": "{\"headline\": \"x\", \"severity\": \"critical\", \"findings\": \"oops\", \"recommended_checks\": \"Check C\"}",
+      "expected": { "severity": "watch", "headline": "New service installed (1x in 24h)", "checks": ["Check A"] }
+    }
+  ]
+}

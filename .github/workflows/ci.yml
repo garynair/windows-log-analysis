@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Digest script tests
+        run: python3 -m unittest discover -s tests -v
+      - name: n8n workflow tests
+        run: node --test
+
+  stack:
+    runs-on: ubuntu-latest
+    env:
+      GRAFANA_ADMIN_PASSWORD: ci-only-password
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start Loki and Grafana
+        run: docker compose up -d --quiet-pull
+      - name: Smoke test (synthetic events -> digest -> Loki)
+        run: ./scripts/smoke_test.sh
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --tail 100
