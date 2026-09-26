@@ -8,6 +8,8 @@ loki.write "wsl" {
   }
 }
 
+// channel labels use the full Windows channel names, which the dashboard queries expect
+
 // Promote event_id to a label so dashboard queries stay fast (low cardinality: ~30 IDs)
 loki.process "winevt" {
   forward_to = [loki.write.wsl.receiver]
@@ -25,7 +27,7 @@ loki.source.windowsevent "security" {
   xpath_query            = "*[System[(EventID=4624 or EventID=4625 or EventID=4672 or EventID=4688 or EventID=4719 or EventID=4720 or EventID=4722 or EventID=4725 or EventID=4726 or EventID=4728 or EventID=4732 or EventID=4740 or EventID=4756 or EventID=1102)]]"
   bookmark_path          = "C:/ProgramData/GrafanaLabs/Alloy/bookmark-security.xml"
   use_incoming_timestamp = true
-  labels                 = { job = "windows", channel = "security", host = constants.hostname }
+  labels                 = { job = "windows", channel = "Security", host = constants.hostname }
   forward_to             = [loki.process.winevt.receiver]
 }
 
@@ -35,7 +37,7 @@ loki.source.windowsevent "system" {
   xpath_query            = "*[System[(EventID=7045 or EventID=104 or EventID=6005 or EventID=6006 or EventID=6008 or EventID=7040)]]"
   bookmark_path          = "C:/ProgramData/GrafanaLabs/Alloy/bookmark-system.xml"
   use_incoming_timestamp = true
-  labels                 = { job = "windows", channel = "system", host = constants.hostname }
+  labels                 = { job = "windows", channel = "System", host = constants.hostname }
   forward_to             = [loki.process.winevt.receiver]
 }
 
@@ -45,7 +47,7 @@ loki.source.windowsevent "defender" {
   xpath_query            = "*[System[(EventID=1116 or EventID=1117 or EventID=5001 or EventID=5007)]]"
   bookmark_path          = "C:/ProgramData/GrafanaLabs/Alloy/bookmark-defender.xml"
   use_incoming_timestamp = true
-  labels                 = { job = "windows", channel = "defender", host = constants.hostname }
+  labels                 = { job = "windows", channel = "Microsoft-Windows-Windows Defender/Operational", host = constants.hostname }
   forward_to             = [loki.process.winevt.receiver]
 }
 
@@ -55,7 +57,7 @@ loki.source.windowsevent "powershell" {
   xpath_query            = "*[System[(EventID=4104) and (Level=3)]]"
   bookmark_path          = "C:/ProgramData/GrafanaLabs/Alloy/bookmark-powershell.xml"
   use_incoming_timestamp = true
-  labels                 = { job = "windows", channel = "powershell", host = constants.hostname }
+  labels                 = { job = "windows", channel = "Microsoft-Windows-PowerShell/Operational", host = constants.hostname }
   forward_to             = [loki.process.winevt.receiver]
 }
 
@@ -65,7 +67,7 @@ loki.source.windowsevent "dns" {
   xpath_query            = "*[System[(EventID=3008)]]"
   bookmark_path          = "C:/ProgramData/GrafanaLabs/Alloy/bookmark-dns.xml"
   use_incoming_timestamp = true
-  labels                 = { job = "windows", channel = "dns", host = constants.hostname }
+  labels                 = { job = "windows", channel = "Microsoft-Windows-DNS-Client/Operational", host = constants.hostname }
   forward_to             = [loki.process.winevt.receiver]
 }
 
@@ -75,6 +77,6 @@ loki.source.windowsevent "dns" {
 //   xpath_query            = "*"
 //   bookmark_path          = "C:/ProgramData/GrafanaLabs/Alloy/bookmark-sysmon.xml"
 //   use_incoming_timestamp = true
-//   labels                 = { job = "windows", channel = "sysmon", host = constants.hostname }
+//   labels                 = { job = "windows", channel = "Microsoft-Windows-Sysmon/Operational", host = constants.hostname }
 //   forward_to             = [loki.process.winevt.receiver]
 // }
