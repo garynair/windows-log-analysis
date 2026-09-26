@@ -4,7 +4,7 @@ services:
     image: grafana/loki:3.4.2          # pinned known-good; bump after first working run
     command: -config.file=/etc/loki/loki-config.yaml
     ports:
-      - "3100:3100"                    # Alloy (Windows) pushes here via WSL localhost forwarding
+      - "127.0.0.1:3100:3100"          # loopback only; Windows (Alloy) still reaches it via WSL localhost forwarding
     volumes:
       - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki_data:/loki
@@ -14,7 +14,7 @@ services:
   grafana:
     image: grafana/grafana:11.5.2      # pinned known-good; bump after first working run
     ports:
-      - "3001:3000"                    # 3000 is taken by Open WebUI
+      - "127.0.0.1:3001:3000"          # loopback only; 3000 is taken by Open WebUI
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
